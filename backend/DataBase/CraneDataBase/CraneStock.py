@@ -2,6 +2,7 @@ import asyncio
 import pandas as pd
 
 from backend.DataBase.database import Database
+from backend.models.DatabaseModels.Models import CranStock
 
 
 class CraneStock(Database):
@@ -10,42 +11,41 @@ class CraneStock(Database):
         super().__init__()
         asyncio.get_event_loop().run_until_complete(super().connect())
 
-    async def select(self, on_the_go: bool = False, model: str = None, coordinates: str = None):
-        if model:
-            model_id = await self.cursor.execute("SELECT * FROM crane_model WHERE model=(%s)", (model,))
-            if on_the_go and coordinates:
-                await self.cursor.execute(
-                    "SELECT * FROM crane_stock "
-                    "WHERE model_id=(%s) AND on_the_go=(%s) AND coordinates=(%s)",
-                    (model_id, on_the_go, coordinates))
-            if on_the_go:
-                await self.cursor.execute("SELECT * FROM crane_stock "
-                                          "WHERE model_id=(%s) AND on_the_go=(%s)", (on_the_go, ))
-            else:
-                await self.cursor.execute("SELECT * FROM crane_stock WHERE model_id=(%s)", (model_id,))
-        elif on_the_go:
-            await self.cursor.execute("SELECT * FROM crane_stock WHERE on_the_go=(%s)", (on_the_go,))
-        elif coordinates:
-            await self.cursor.execute("SELECT * FROM crane_stock WHERE coordinates=(%s)", (coordinates,))
-        else:
-            await self.cursor.execute("SELECT * FROM crane_brand")
+    async def select(self):
+        await self.cursor.execute("SELECT * FROM crane_brand")
         data = await self.cursor.fetchall()
         data = pd.DataFrame(data, columns=['id', 'model_id', 'coordinates', 'on_the_go', 'info'])
         return data
 
-    async def insert(self, values: tuple):
+    async def insert(self, crane_stock: CranStock):
         await self.cursor.execute("INSERT INTO crane_stock(model_id, coordinates, on_the_go, info) "
-                                  "VALUES (%s, %s,%s, %s)", values)
+                                  "VALUES (%s, %s,%s, %s)", (crane_stock.MODEL_ID, crane_stock.coordinates, crane_stock.on_the_go, crane_stock.info))
 
-    async def delete(self, model_id: int):
-        await self.cursor.execute("DELETE FROM crane_brand WHERE brand=(%s)", (model_id, ))
+    async def delete(self, crane_stock: CranStock):
+        await self.cursor.execute("DELETE FROM crane_stock WHERE model_id=(%s)", (crane_stock.MODEL_ID,))
 
-    async def update(self, model_id: int, on_the_go: bool, coordinates: str, info: str):
-        await self.cursor.execute("UPDATE crane_stock SET coordinates=(%s), on_the_go=(%s), info=(%s) "
-                                  "WHERE model_id=(%s)", (coordinates, on_the_go, info))
+    async def update(self, crane_stock: CranStock):
+        try:
+            model = (crane_stock.dict())
+            values = ''
+            fields = ''
+            for val in model:
+                if model[val] and val != "MODEL_ID":
+
+                    if type(model[val]) is int:
+                        values += f"{val} = {model[val]},"
+                    else:
+                        values += f"{val} = '{model[val]}',"
+            values, fields = values[:-1], fields[:-1]
+            _SQL = f'UPDATE crane_stock SET {values} WHERE model = "{crane_stock.MODEL_ID}"'
+            await self.cursor.execute(_SQL)
+
+        except Exception as e:
+            print(e)
 
 
 if __name__ == "__main__":
     db = CraneStock()
-    res = asyncio.get_event_loop().run_until_complete(db.select(model="CTT 191-10 TS21", on_the_go=False))
+    cr = CranStock(MODEL_ID=6, coordinates="2,3,4,5", on_the_go=True, info='')
+    res = asyncio.get_event_loop().run_until_complete(db.insert(cr))
     print(res)
