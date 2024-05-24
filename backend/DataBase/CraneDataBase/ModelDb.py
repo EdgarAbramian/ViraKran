@@ -1,4 +1,3 @@
-import asyncio
 import pandas as pd
 
 from backend.DataBase.database import Database
@@ -9,7 +8,6 @@ class ModelDb(Database):
 
     def __init__(self):
         super().__init__()
-        asyncio.get_event_loop().run_until_complete(super().connect())
 
     async def select(self, crane_model: CraneModelSelect):
         """
@@ -21,7 +19,7 @@ class ModelDb(Database):
         Returns:
             str: JSON string representing the selected data records.
         """
-
+        await self.connect()
         # Extract the model information from the CraneModelSelect object
         model_info = crane_model.dict()
 
@@ -30,16 +28,18 @@ class ModelDb(Database):
 
         # Iterate through the model information to build the SQL WHERE clause
         for col in model_info:
-            if type(model_info.get(col)) is str:
+            if type(model_info.get(col)) is str and model_info.get(col) != '':
                 _SQL_COLUMNS += "{}='{}' AND ".format(col, model_info.get(col)) if model_info.get(col) else ''
             else:
                 _SQL_COLUMNS += "{}={} AND ".format(col, model_info.get(col)) if model_info.get(col) else ''
 
         # Remove the trailing 'AND ' and join the SQL columns
         _SQL_COLUMNS = ' '.join(_SQL_COLUMNS.split()[:-1])
-
-        # Execute the SQL query to select data from the 'crane_model' table
-        await self.cursor.execute(f"SELECT * FROM crane_model WHERE {_SQL_COLUMNS}")
+        if _SQL_COLUMNS == '':
+            await self.cursor.execute(f"SELECT * FROM crane_model")
+        else:
+            # Execute the SQL query to select data from the 'crane_model' table
+            await self.cursor.execute(f"SELECT * FROM crane_model WHERE {_SQL_COLUMNS}")
 
         # Fetch the selected data
         data = await self.cursor.fetchall()
@@ -57,6 +57,7 @@ class ModelDb(Database):
         Args:
             crane_model (CraneModel): The crane model object to insert.
         """
+        await self.connect()
 
         # Convert crane_model to a dictionary
         model = (crane_model.dict())
@@ -83,11 +84,12 @@ class ModelDb(Database):
 
         # Construct the SQL query
         _SQL = f'INSERT INTO crane_model({fields}) VALUES({values})'
-
-        # Execute the SQL query
-        await self.cursor.execute(_SQL)
-
-        return True
+        try:
+            # Execute the SQL query
+            await self.cursor.execute(_SQL)
+            return True
+        except Exception as e:
+            return {'error': str(e)}
 
     async def delete(self, crane_model: CraneModelDelete):
         """
@@ -96,6 +98,8 @@ class ModelDb(Database):
         Args:
             crane_model (CraneModelDelete): The crane model object to delete.
         """
+        await self.connect()
+
         try:
             # Start a transaction and set autocommit to 0
             await self.cursor.execute(
@@ -120,11 +124,12 @@ class ModelDb(Database):
             crane_model: An instance of CraneModelUpdate containing the updated values for the crane model.
 
         """
+        await self.connect()
+
         try:
             # Convert CraneModelUpdate object to a dictionary
             model = (crane_model.dict())
             values = ''
-            fields = ''
 
             # Iterate over the dictionary and build the SET clause for the SQL query
             for val in model:
@@ -137,8 +142,12 @@ class ModelDb(Database):
             # Remove the trailing comma from values
             values = values[:-1]
 
-            # Construct the SQL query
-            _SQL = f'UPDATE crane_model SET {values} WHERE model = "{crane_model.model}"'
+            if crane_model.model:
+                # Construct the SQL query
+                _SQL = f'UPDATE crane_model SET {values} WHERE model = "{crane_model.model}"'
+            else:
+                # Construct the SQL query
+                _SQL = f'UPDATE crane_model SET {values} WHERE id = "{crane_model.id}"'
 
             # Execute the SQL query
             await self.cursor.execute(_SQL)
@@ -146,14 +155,4 @@ class ModelDb(Database):
             return True
         except Exception as e:
             # Log any exceptions that occur during the update process
-            print(e)
-            return False
-
-
-if __name__ == "__main__":
-    db = ModelDb()
-    model = CraneModelSelect(model='tes1t')
-    new_model = CraneModelUpdate(model='tesasdff', height_anker_C38=1.0, height_anker_C45=1.0, height_anker_C60=1.0)
-    loop = asyncio.get_event_loop()
-    model_info = loop.run_until_complete(db.update(new_model))
-    print(model_info)
+            return {'error': str(e)}

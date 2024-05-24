@@ -13,8 +13,14 @@ class User(BaseModel):
 
 class CraneBrand(BaseModel):
     id: typing.Optional[int] = None
-    brand: typing.Optional[str]
+    brand: typing.Optional[str] = None
     info: typing.Optional[str] = None
+
+
+class CraneBrandSelect(BaseModel):
+    id: int = None
+    brand: str
+    info: str = None
 
 
 class CraneModelSelect(BaseModel):
@@ -28,7 +34,7 @@ class CraneModelSelect(BaseModel):
         crane_type: str
     """
 
-    model: str
+    model: typing.Optional[str] = None
     id: typing.Optional[int] = 0
     brand_id: typing.Optional[int] = 0
     crane_brand: typing.Optional[str] = ''
@@ -59,7 +65,7 @@ class CraneModel(BaseModel):
 class CraneModelUpdate(BaseModel):
     id: typing.Optional[int] = None
     brand_id: typing.Optional[int] = None
-    model: str
+    model: typing.Optional[str] = None
     description: typing.Optional[str] = None
     crane_type: typing.Optional[str] = None
     load_moment: typing.Optional[float] = None
@@ -73,9 +79,9 @@ class CraneModelUpdate(BaseModel):
     height_anker_C60: typing.Optional[float] = None
 
 
-class CranStock(BaseModel):
+class CranStockModel(BaseModel):
     id: typing.Optional[int] = None
-    MODEL_ID: typing.Optional[int]
+    model_id: typing.Optional[int] = None
     coordinates: typing.Optional[str] = None
     on_the_go: typing.Optional[bool] = None
     info: typing.Optional[str] = None
@@ -89,16 +95,26 @@ class MailingList(BaseModel):
     comments: typing.Optional[str] = None
 
 
-class RentalApplicationUser(BaseModel):
+class RentalApplication(BaseModel):
     id: typing.Optional[int] = None
     name: str | None
     email: str | None
     phone: typing.Optional[str] = None
-
-
-class RentalApplication(BaseModel):
-    id: typing.Optional[int] = None
     machinery_id: int | None
     user_msg: typing.Optional[str] = None
-    user_info: RentalApplicationUser | None
     status: typing.Optional[bool] = None
+
+
+class UserLoginForm(BaseModel):
+    username: str
+    password: str
+
+
+class SelectUser(BaseModel):
+    id: typing.Optional[int] = None
+    username: typing.Optional[str] = None
+
+
+class UpdtUser(BaseModel):
+    username: typing.Optional[str] = None
+    passw: typing.Optional[str] = None

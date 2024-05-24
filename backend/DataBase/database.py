@@ -37,8 +37,8 @@ class Database:
             print(f"Disconnected from MySQL database {self.__class__.__name__}")
 
 
-if __name__ == "__main__":
-    db = Database()
-    asyncio.new_event_loop().run_until_complete(db.connect())
+# if __name__ == "__main__":
+#     db = Database()
+#     asyncio.new_event_loop().run_until_complete(db.connect())
     # asyncio.run(db.connect())
     # asyncio.run(db.disconnect())

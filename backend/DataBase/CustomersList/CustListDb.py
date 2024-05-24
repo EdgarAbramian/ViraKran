@@ -8,7 +8,7 @@ from backend.models.DatabaseModels.Models import MailingList
 class CustListDb(Database):
     def __init__(self):
         super().__init__()
-        asyncio.get_event_loop().run_until_complete(super().connect())
+        # asyncio.get_event_loop().run_until_complete(super().connect())
 
     async def select(self):
         """
@@ -17,10 +17,14 @@ class CustListDb(Database):
         Returns:
             pd.DataFrame: A DataFrame containing the retrieved records.
         """
-        await self.cursor.execute("SELECT * FROM mailing_list")
-        data = await self.cursor.fetchall()
-        data = pd.DataFrame(data, columns=['id', 'company_name', 'email', 'comp_info', 'comments'])
-        return data
+        try:
+            await self.connect()
+            await self.cursor.execute("SELECT * FROM mailing_list")
+            data = await self.cursor.fetchall()
+            data = pd.DataFrame(data, columns=['id', 'company_name', 'email', 'comp_info', 'comments'])
+            return data.to_json(orient='records')
+        except Exception as e:
+            return {'error': e}
 
     async def insert(self, values: MailingList):
         """
@@ -30,28 +34,35 @@ class CustListDb(Database):
             values (MailingList): The MailingList object containing the values to insert.
 
         """
-        model = (values.dict())
-        values = ''
-        fields = ''
+        try:
+            await self.connect()
 
-        # Iterate over the model dictionary to build the values and fields strings
-        for val in model:
-            if model[val]:
-                fields += f" {val},"
-                if type(model[val]) is int:
-                    values += f" {model[val]},"
-                else:
-                    values += f" '{model[val]}',"
-        # Remove the trailing comma from values and fields
-        values, fields = values[:-1], fields[:-1]
+            model = (values.dict())
+            values = ''
+            fields = ''
 
-        # Construct the SQL query
-        _SQL = f'INSERT INTO mailing_list({fields}) VALUES({values})'
+            # Iterate over the model dictionary to build the values and fields strings
+            for val in model:
+                if model[val]:
+                    fields += f" {val},"
+                    if type(model[val]) is int:
+                        values += f" {model[val]},"
+                    else:
+                        values += f" '{model[val]}',"
+            # Remove the trailing comma from values and fields
+            values, fields = values[:-1], fields[:-1]
 
-        # Execute the SQL query
-        await self.cursor.execute(_SQL)
+            # Construct the SQL query
+            _SQL = f'INSERT INTO mailing_list({fields}) VALUES({values})'
 
-    async def delete(self, mailing_list: MailingList):
+            # Execute the SQL query
+            await self.cursor.execute(_SQL)
+
+            return True
+        except Exception as e:
+            return {'error': e}
+
+    async def delete(self, email):
         """
         Delete a record from the mailing_list table based on the provided MailingList object.
 
@@ -63,21 +74,14 @@ class CustListDb(Database):
 
         Returns:
             bool: True if the record is successfully deleted.
+            :param email:
         """
-        if mailing_list.id:
-            # Delete record based on id
-            await self.cursor.execute("DELETE FROM mailing_list WHERE id=(%s)", (mailing_list.id,))
-        elif mailing_list.company_name:
-            # Delete record based on company name
-            await self.cursor.execute("DELETE FROM mailing_list WHERE company_name=(%s)", (mailing_list.company_name,))
-        else:
-            # Raise an error if both id and company_name are missing
-            raise ValueError("c_id or comp_name must be provided")
-        return True
+        await self.connect()
 
-
-if __name__ == "__main__":
-    db = CustListDb()
-    cr = MailingList(company_name='test', email='test', comp_info='test', comments='test')
-    res = asyncio.get_event_loop().run_until_complete(db.insert(cr))
-    print(res)
+        try:
+            if email:
+                # Delete record based on id
+                await self.cursor.execute("DELETE FROM mailing_list WHERE email=(%s)", (email,))
+            return True
+        except Exception as e:
+            return {'error': e}

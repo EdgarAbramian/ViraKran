@@ -2,6 +2,7 @@ import asyncio
 import pandas as pd
 
 from backend.DataBase.database import Database
+from backend.models.DatabaseModels.Models import SelectUser, UserLoginForm, UpdtUser
 
 
 class UserLoginData(Database):
@@ -9,77 +10,76 @@ class UserLoginData(Database):
         super().__init__()
         asyncio.get_event_loop().run_until_complete(super().connect())
 
-    async def select(self, user_id):
+    async def select(self, user: SelectUser):
         """
         Execute a SELECT query to retrieve user data based on the user_id.
 
         Args:
-            user_id (int): The ID of the user for data retrieval.
+            user (SelectUser): The ID of the user for data retrieval.
 
         Returns:
             pd.DataFrame: A DataFrame containing the retrieved user data with columns ['user_id', 'username', 'pass'].
         """
-        await self.cursor.execute("SELECT * FROM login_data where id=(%s)", (user_id,))
-        data = await self.cursor.fetchall()
-        data = pd.DataFrame(data, columns=['user_id', 'username', 'pass'])
-        return data
+        await self.connect()
+        try:
+            if user.id:
+                await self.cursor.execute("SELECT * FROM login_data where id=(%s)", (user.id,))
+            elif user.username:
+                await self.cursor.execute("SELECT * FROM login_data where username_hash=(%s)", (user.username,))
+            else:
+                await self.cursor.execute("SELECT * FROM login_data")
 
-    async def insert(self, values: tuple):
+            data = await self.cursor.fetchall()
+            data = pd.DataFrame(data, columns=['id', 'username', 'pass'])
+            return data.to_json(orient='records')
+        except Exception as e:
+            return {'error': str(e)}
+
+    async def insert(self, user: UserLoginForm):
         """
         Inserts a new record into the login_data table with the provided values.
 
         Args:
-            values (tuple): A tuple containing the values to be inserted.
+            user (UserLoginForm): A tuple containing the values to be inserted.
 
         Returns:
             bool: True if the insertion was successful.
         """
-        await self.cursor.execute("INSERT INTO login_data(user_id, username_hash, pass_hash)"
-                                  " VALUES (%s, %s, %s)", values)
-        return True
+        await self.connect()
 
-    async def update(self, user_id: int, username: str = None, passw: str = None):
+        try:
+            await self.cursor.execute("INSERT INTO login_data(username_hash, pass_hash)"
+                                      " VALUES (%s, %s)", (user.username, user.password))
+            return True
+        except Exception as e:
+            return {'error': str(e)}
+
+    async def update(self, user: UpdtUser):
         """
         Update user data in the database.
 
         Args:
-            user_id (int): The ID of the user to update.
-            username (str, optional): The new username. Defaults to None.
-            passw (str, optional): The new password. Defaults to None.
+            user (UpdtUser, optional): The new username. Defaults to None.
 
         Returns:
             bool: True if the update was successful.
         """
+        await self.connect()
 
-        # Update both username and password
-        if username and passw:
-            await self.cursor.execute("UPDATE login_data SET username_hash=(%s), pass_hash=(%s) "
-                                      "WHERE user_id=(%s)", (username, passw, user_id))
-        # Update only username
-        if username:
-            await self.cursor.execute("UPDATE login_data SET username_hash=(%s) "
-                                      "WHERE user_id=(%s)", (username, user_id))
-        # Update only password
-        if passw:
-            await self.cursor.execute("UPDATE login_data SET pass_hash=(%s) "
-                                      "WHERE user_id=(%s)", (passw, user_id))
-        return True
+        try:
+            if user.username:
+                await self.cursor.execute(
+                    f"UPDATE login_data SET username_hash='{user.username}', pass_hash='{user.passw}' WHERE username_hash='{user.username}'")
+            return True
+        except Exception as e:
+            return {'error': str(e)}
 
-    async def delete(self, user_id: int = None):
-        """
-        Deletes a user's login data from the database.
+    async def delete(self, username: str):
 
-        Args:
-            user_id (int): The ID of the user whose login data will be deleted.
+        await self.connect()
 
-        Returns:
-            bool: True if the deletion was successful.
-        """
-        await self.cursor.execute("DELETE FROM login_data WHERE id=(%s)", (user_id,))
-        return True
-
-
-if __name__ == "__main__":
-    db = UserLoginData()
-    res = asyncio.get_event_loop().run_until_complete(db.insert(('test', 'test', 'test', 'test')))
-    print(res)
+        try:
+            await self.cursor.execute("DELETE FROM login_data WHERE username_hash=(%s)", (username,))
+            return True
+        except Exception as e:
+            return {'error': str(e)}
